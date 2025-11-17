@@ -1,0 +1,1466 @@
+import java.util.*;
+
+// =================================================================================
+// 1. ENUMERATIONS
+// =================================================================================
+enum ApplicationStage
+{
+    SUBMITTED, IN_REVIEW, INTERVIEW, OFFERED, OFFER_ACCEPTED, OFFER_DECLINED, DECLINED
+}
+
+enum JobStatus
+{
+    OPEN, FILLED
+}
+
+
+// =================================================================================
+// 2. CORE DATA MODELS
+// =================================================================================
+
+class Organization
+{
+    private final String id;
+    private final String name;
+    private final String password;
+
+    public Organization(String id, String name, String password)
+    {
+        this.id = id; this.name = name; this.password = password;
+    }
+    public String getId()
+    {
+        return id;
+    }
+    public String getName()
+    {
+        return name;
+    }
+    public boolean isPasswordCorrect(String input)
+    {
+        return this.password.equals(input);
+    }
+}
+
+class Candidate
+{
+    private final String id;
+    private final String name;
+    private final String password;
+    private final int experience;
+    private final Set skills;
+    private final List applications;
+
+    public Candidate(String id, String name, String password, int exp)
+    {
+        this.id = id; this.name = name; this.password = password;
+        this.experience = exp;
+        this.skills = new HashSet(); // Using Set to avoid duplicate skills
+        this.applications = new ArrayList();
+    }
+    public void addSkill(String skill)
+    {
+        this.skills.add(skill.trim());
+    }
+    public void addApplication(JobApplication app)
+    {
+        this.applications.add(app);
+    }
+    public String getId()
+    {
+        return id;
+    }
+    public String getName()
+    {
+        return name;
+    }
+    public int getExperience()
+    {
+        return experience;
+    }
+    public Set getSkills()
+    {
+        return Collections.unmodifiableSet(skills);
+    }
+    public List getApplications()
+    {
+        return applications;
+    }
+    public boolean isPasswordCorrect(String input)
+    {
+        return this.password.equals(input);
+    }
+    
+    public boolean withdrawApplication(int appId)
+    {
+        // DSA Concept: DELETION from a List using an Iterator
+        Iterator it = this.applications.iterator();
+        while (it.hasNext())
+        {
+            JobApplication app = (JobApplication) it.next();
+            if (app.getAppId() == appId)
+            {
+                it.remove(); // Safe deletion while traversing
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+class JobOpening
+{
+    private final String id;
+    private final String title;
+    private final Organization org;
+    private final int reqExperience;
+    private final Set reqSkills;
+    private final List applications;
+    private JobStatus status;
+    private Candidate hired;
+
+    public JobOpening(String id, String title, Organization org, int exp)
+    {
+        this.id = id; this.title = title; this.org = org;
+        this.reqExperience = exp;
+        this.reqSkills = new HashSet(); // Using Set to avoid duplicate skills
+        this.applications = new ArrayList();
+        this.status = JobStatus.OPEN;
+        this.hired = null;
+    }
+    public void addSkill(String skill)
+    {
+        this.reqSkills.add(skill.trim());
+    }
+    public void receiveApplication(JobApplication app)
+    {
+        this.applications.add(app);
+    }
+    public String getId()
+    {
+        return id;
+    }
+    public String getTitle()
+    {
+        return title;
+    }
+    public Organization getOrg()
+    {
+        return org;
+    }
+    public int getReqExperience()
+    {
+        return reqExperience;
+    }
+    public Set getReqSkills()
+    {
+        return Collections.unmodifiableSet(reqSkills);
+    }
+    public List getApplications()
+    {
+        return Collections.unmodifiableList(applications);
+    }
+    public JobStatus getStatus()
+    {
+        return status;
+    }
+    public Candidate getHired()
+    {
+        return hired;
+    }
+    public void fillPosition(Candidate candidate)
+    {
+        this.status = JobStatus.FILLED;
+        this.hired = candidate;
+    }
+    
+    public void removeApplication(int appId)
+    {
+        // DSA Concept: DELETION from a List using an Iterator
+        Iterator it = this.applications.iterator();
+        while (it.hasNext())
+        {
+            JobApplication app = (JobApplication) it.next();
+            if (app.getAppId() == appId)
+            {
+                it.remove();
+                break; 
+            }
+        }
+    }
+}
+
+class JobApplication
+{
+    private static int nextId = 0;
+    
+    private final int appId;
+    private final Candidate candidate;
+    private final JobOpening job;
+    private final double score;
+    private ApplicationStage stage;
+
+    public JobApplication(Candidate c, JobOpening j, double score)
+    {
+        this.appId = ++nextId;
+        this.candidate = c; this.job = j;
+        this.score = score;
+        this.stage = ApplicationStage.SUBMITTED;
+    }
+    
+    public int getAppId()
+    {
+        return appId;
+    }
+    public Candidate getCandidate()
+    {
+        return candidate;
+    }
+    public JobOpening getJob()
+    {
+        return job;
+    }
+    public double getScore()
+    {
+        return score;
+    }
+    public ApplicationStage getStage()
+    {
+        return stage;
+    }
+    public void setStage(ApplicationStage stage)
+    {
+        this.stage = stage;
+    }
+}
+
+// =================================================================================
+// 3. TREE DATA STRUCTURE IMPLEMENTATION
+// =================================================================================
+
+class TreeNode
+{
+    JobOpening job;
+    TreeNode left;
+    TreeNode right;
+
+    public TreeNode(JobOpening job)
+    {
+        this.job = job;
+        this.left = null;
+        this.right = null;
+    }
+}
+
+// DSA Concept: BINARY TREE
+class JobSearchTree
+{
+    private TreeNode root;
+    private final Comparator comparator; 
+
+    public JobSearchTree(Comparator comparator)
+    {
+        this.root = null;
+        this.comparator = comparator;
+    }
+
+    public void insert(JobOpening job)
+    {
+        // DSA Concept: INSERTION into a Tree
+        this.root = insertRecursive(this.root, job);
+    }
+
+    private TreeNode insertRecursive(TreeNode current, JobOpening job)
+    {
+        if (current == null)
+        {
+            return new TreeNode(job);
+        }
+
+        if (comparator.compare(job, current.job) < 0)
+        {
+            current.left = insertRecursive(current.left, job);
+        }
+        else if (comparator.compare(job, current.job) > 0)
+        {
+            current.right = insertRecursive(current.right, job);
+        }
+        
+        return current;
+    }
+
+    public List search(String key)
+    {
+        List results = new ArrayList();
+        JobOpening searchKey = createSearchKey(key);
+        // DSA Concept: TRAVERSAL of a Tree (recursive search)
+        searchRecursive(this.root, searchKey, results);
+        return results;
+    }
+
+    private void searchRecursive(TreeNode current, JobOpening searchKey, List results)
+    {
+        if (current == null)
+        {
+            return;
+        }
+
+        int compareResult = comparator.compare(searchKey, current.job);
+
+        if (compareResult < 0)
+        {
+            searchRecursive(current.left, searchKey, results);
+        }
+        else if (compareResult > 0)
+        {
+            searchRecursive(current.right, searchKey, results);
+        }
+        else
+        {
+            results.add(current.job);
+            searchRecursive(current.left, searchKey, results);
+            searchRecursive(current.right, searchKey, results);
+        }
+    }
+    
+    private JobOpening createSearchKey(String key)
+    {
+        if (this.comparator instanceof JobTitleComparator)
+        {
+            return new JobOpening("", key, null, 0);
+        }
+        else if (this.comparator instanceof JobCompanyNameComparator)
+        {
+            Organization tempOrg = new Organization("", key, "");
+            return new JobOpening("", "", tempOrg, 0);
+        }
+        return null;
+    }
+}
+
+
+// =================================================================================
+// 4. NAMED COMPARATOR CLASSES
+// =================================================================================
+
+class ApplicantScoreComparator implements Comparator
+{
+    public int compare(Object o1, Object o2)
+    {
+        JobApplication app1 = (JobApplication) o1;
+        JobApplication app2 = (JobApplication) o2;
+        return Double.compare(app2.getScore(), app1.getScore()); // Descending
+    }
+}
+
+class JobExperienceComparator implements Comparator
+{
+    public int compare(Object o1, Object o2)
+    {
+        JobOpening job1 = (JobOpening) o1;
+        JobOpening job2 = (JobOpening) o2;
+        return Integer.compare(job1.getReqExperience(), job2.getReqExperience());
+    }
+}
+
+class JobCompanyNameComparator implements Comparator
+{
+    public int compare(Object o1, Object o2)
+    {
+        JobOpening j1 = (JobOpening) o1;
+        JobOpening j2 = (JobOpening) o2;
+        return j1.getOrg().getName().compareToIgnoreCase(j2.getOrg().getName());
+    }
+}
+
+class JobTitleComparator implements Comparator
+{
+    public int compare(Object o1, Object o2)
+    {
+        JobOpening j1 = (JobOpening) o1;
+        JobOpening j2 = (JobOpening) o2;
+        return j1.getTitle().compareToIgnoreCase(j2.getTitle());
+    }
+}
+
+class RecommendationScoreComparator implements Comparator
+{
+    public int compare(Object o1, Object o2)
+    {
+        Map.Entry entry1 = (Map.Entry) o1;
+        Map.Entry entry2 = (Map.Entry) o2;
+        Double score1 = (Double) entry1.getValue();
+        Double score2 = (Double) entry2.getValue();
+        return score2.compareTo(score1);
+    }
+}
+
+
+// =================================================================================
+// 5. DATA STORAGE
+// =================================================================================
+class DataStorage
+{
+    // DSA Concept: HASH TABLE for fast O(1) lookups by ID
+    private final Map candidateMap = new HashMap();
+    private final Map jobMap = new HashMap();
+    private final Map orgMap = new HashMap();
+    
+    // DSA Concept: LINKED LIST for primary storage lists
+    private final List candidateList = new LinkedList();
+    private final List jobList = new LinkedList();
+    private final List orgList = new LinkedList();
+    
+    private final JobSearchTree jobsByTitleTree = new JobSearchTree(new JobTitleComparator());
+    private final JobSearchTree jobsByCompanyTree = new JobSearchTree(new JobCompanyNameComparator());
+
+    public void saveCandidate(Candidate c)
+    {
+        // DSA Concept: INSERTION into HashMap and LinkedList
+        candidateMap.put(c.getId().toLowerCase(), c);
+        candidateList.add(c);
+    }
+    public Candidate findCandidateById(String id)
+    {
+        return (Candidate) candidateMap.get(id.toLowerCase());
+    }
+    public List getAllCandidates()
+    {
+        return candidateList;
+    }
+
+    public void saveJob(JobOpening j)
+    {
+        // DSA Concept: INSERTION into HashMap, LinkedList, and Trees
+        jobMap.put(j.getId().toLowerCase(), j);
+        jobList.add(j);
+        jobsByTitleTree.insert(j);
+        jobsByCompanyTree.insert(j);
+    }
+    public JobOpening findJobById(String id)
+    {
+        return (JobOpening) jobMap.get(id.toLowerCase());
+    }
+    public List getAllJobs()
+    {
+        return jobList;
+    }
+    public void deleteJob(String jobId)
+    {
+        // DSA Concept: DELETION from HashMap and LinkedList
+        JobOpening jobToRemove = (JobOpening) jobMap.remove(jobId.toLowerCase());
+        if (jobToRemove != null)
+        {
+            jobList.remove(jobToRemove);
+        }
+    }
+    public JobSearchTree getJobsByTitleTree()
+    {
+        return jobsByTitleTree;
+    }
+    public JobSearchTree getJobsByCompanyTree()
+    {
+        return jobsByCompanyTree;
+    }
+
+    public void saveOrg(Organization o)
+    {
+        // DSA Concept: INSERTION into HashMap and LinkedList
+        orgMap.put(o.getId().toLowerCase(), o);
+        orgList.add(o);
+    }
+    public Organization findOrgById(String id)
+    {
+        return (Organization) orgMap.get(id.toLowerCase());
+    }
+    public List getAllOrgs()
+    {
+        return orgList;
+    }
+}
+
+
+// =================================================================================
+// 6. LOGIC SERVICES
+// =================================================================================
+class Matcher
+{
+    public double calculateScore(Candidate candidate, JobOpening job)
+    {
+        double skillScore = 0;
+        if (!job.getReqSkills().isEmpty())
+        {
+            int commonSkillCount = 0;
+            // DSA Concept: TRAVERSAL (Nested)
+            Iterator candidateSkillIterator = candidate.getSkills().iterator();
+            while (candidateSkillIterator.hasNext())
+            {
+                String candidateSkill = (String) candidateSkillIterator.next();
+                Iterator requiredSkillIterator = job.getReqSkills().iterator();
+                while (requiredSkillIterator.hasNext())
+                {
+                    String requiredSkill = (String) requiredSkillIterator.next();
+                    if (candidateSkill.equalsIgnoreCase(requiredSkill))
+                    {
+                        commonSkillCount++;
+                        break; 
+                    }
+                }
+            }
+            skillScore = ((double) commonSkillCount / job.getReqSkills().size()) * 70.0;
+        }
+
+        double experienceScore = 0;
+        int requiredExp = job.getReqExperience();
+        int candidateExp = candidate.getExperience();
+        if (requiredExp == 0)
+        {
+            experienceScore = 30.0;
+        }
+        else if (candidateExp >= requiredExp)
+        {
+            experienceScore = 30.0;
+        }
+        else
+        {
+            experienceScore = ((double) candidateExp / requiredExp) * 30.0;
+        }
+
+        double totalScore = skillScore + experienceScore;
+        return Math.min(totalScore, 100.0);
+    }
+
+    public List rankApplicants(JobOpening job)
+    {
+        List applicants = new ArrayList(job.getApplications());
+        // DSA Concept: MERGE/QUICK SORT (via Collections.sort)
+        Collections.sort(applicants, new ApplicantScoreComparator());
+        return applicants;
+    }
+}
+
+class AppService
+{
+    // DSA Concept: HEAP (implemented as PriorityQueue)
+    private final Queue appQueue = new PriorityQueue(new ApplicantScoreComparator());
+    private final Matcher matcher;
+
+    public AppService(Matcher m)
+    {
+        this.matcher = m;
+    }
+
+    public void newApplication(Candidate c, JobOpening j)
+    {
+        double score = matcher.calculateScore(c, j);
+        JobApplication app = new JobApplication(c, j, score);
+        
+        j.receiveApplication(app);
+        c.addApplication(app);
+        
+        // DSA Concept: INSERTION into a Heap/Queue
+        appQueue.offer(app);
+    }
+
+    public void updateStage(JobApplication app, ApplicationStage stage)
+    {
+        app.setStage(stage);
+    }
+    
+    public JobApplication getNextInQueue()
+    {
+        // DSA Concept: DELETION from a Heap/Queue
+        return (JobApplication) appQueue.poll();
+    }
+}
+
+class JobSearch
+{
+    private final DataStorage storage;
+    public JobSearch(DataStorage storage)
+    {
+        this.storage = storage;
+    }
+
+    public List find(String query)
+    {
+        try
+        {
+            int exp = Integer.parseInt(query);
+            return byExperience(exp);
+        }
+        catch (NumberFormatException e)
+        {
+            List results = byCompanyName(query);
+            if (!results.isEmpty())
+            {
+                return results;
+            }
+            results = byJobTitle(query);
+            if (!results.isEmpty())
+            {
+                return results;
+            }
+            return byKeyword(query);
+        }
+    }
+
+    private List byExperience(int maxExp)
+    {
+        List results = new ArrayList();
+        // DSA Concept: TRAVERSAL of the main job list
+        for (Object obj : storage.getAllJobs())
+        {
+            JobOpening job = (JobOpening) obj;
+            if (job.getReqExperience() <= maxExp)
+            {
+                results.add(job);
+            }
+        }
+        // DSA Concept: MERGE/QUICK SORT (via Collections.sort)
+        Collections.sort(results, new JobExperienceComparator());
+        return results;
+    }
+
+    private List byCompanyName(String name)
+    {
+        // DSA Concept: BINARY SEARCH (using the Tree)
+        return storage.getJobsByCompanyTree().search(name);
+    }
+
+    private List byJobTitle(String title)
+    {
+        // DSA Concept: BINARY SEARCH (using the Tree)
+        return storage.getJobsByTitleTree().search(title);
+    }
+
+    private List byKeyword(String keyword)
+    {
+        String lowerKeyword = keyword.toLowerCase();
+        List results = new ArrayList();
+        // DSA Concept: TRAVERSAL (Linear Search)
+        for (Object obj : storage.getAllJobs())
+        {
+            JobOpening job = (JobOpening) obj;
+            if (job.getTitle().toLowerCase().contains(lowerKeyword) ||
+                job.getOrg().getName().toLowerCase().contains(lowerKeyword))
+            {
+                results.add(job);
+                continue;
+            }
+            Iterator skillIterator = job.getReqSkills().iterator();
+            while (skillIterator.hasNext())
+            {
+                String skill = (String) skillIterator.next();
+                if (skill.toLowerCase().contains(lowerKeyword))
+                {
+                    results.add(job);
+                    break; 
+                }
+            }
+        }
+        return results;
+    }
+}
+
+
+// =================================================================================
+// 7. CONSOLE INTERFACE
+// =================================================================================
+class JobPortalCLI
+{
+    private final Scanner scan = new Scanner(System.in);
+    private DataStorage storage;
+    private final Matcher matcher = new Matcher();
+    private AppService appService;
+    private JobSearch search;
+    private int orgCounter = 1, candCounter = 1, jobCounter = 1;
+
+    public void start()
+    {
+        storage = new DataStorage();
+        search = new JobSearch(storage);
+        appService = new AppService(matcher);
+
+        while (true)
+        {
+            System.out.println("\n===== Welcome to the Career Portal =====");
+            int choice = showMenu("I'm a Recruiter", "I'm a Job Seeker", "Exit Program");
+            switch (choice)
+            {
+                case 1: recruiterLogin(); break;
+                case 2: candidateLogin(); break;
+                case 3: 
+                    System.out.println("Thank you for using the Career Portal!");
+                    return;
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+    
+    private void recruiterLogin()
+    {
+        System.out.println("\n--- Recruiter Portal ---");
+        int choice = showMenu("Login to an existing Organization", "Register a new Organization", "Back to Main Menu");
+        switch (choice)
+        {
+            case 1: loginAsOrg(); break;
+            case 2: registerOrg(); break;
+            case 3: return;
+            default: System.out.println("Invalid choice.");
+        }
+    }
+
+    private void loginAsOrg()
+    {
+        System.out.print("Enter your Organization ID or Name: ");
+        String input = scan.nextLine();
+        Organization org = findOrg(input);
+
+        if (org == null)
+        {
+            System.out.println("Organization not found.");
+            return;
+        }
+        
+        System.out.print("Enter password for " + org.getName() + ": ");
+        if (org.isPasswordCorrect(scan.nextLine()))
+        {
+            System.out.println("Login successful. Welcome, " + org.getName() + "!");
+            recruiterDashboard(org);
+        }
+        else
+        {
+            System.out.println("Incorrect password. Access denied.");
+        }
+    }
+
+    private void recruiterDashboard(Organization org)
+    {
+        while (true)
+        {
+            int choice = showMenu("View Job Openings Dashboard", "Post a New Job Opening", "Process Next (Highest-Priority) Application", "Logout");
+            switch (choice)
+            {
+                case 1: showOrgJobs(org); break;
+                case 2: postNewJob(org); break;
+                case 3: processNextApp(); break;
+                case 4: return;
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+    
+    private void processNextApp()
+    {
+        JobApplication app = appService.getNextInQueue();
+        if (app == null)
+        {
+            System.out.println("\nThe application processing queue is empty.");
+            return;
+        }
+
+        System.out.println("\n--- Processing Next Application (Highest Priority) ---");
+        System.out.println("Processing application for: " + app.getCandidate().getName());
+        System.out.println("For the role of: " + app.getJob().getTitle());
+        System.out.println("Match Score: " + String.format("%.2f%%", app.getScore()));
+        System.out.println("Candidate Experience: " + app.getCandidate().getExperience() + " years");
+        System.out.println("Required Experience: " + app.getJob().getReqExperience() + " years");
+        System.out.println("Candidate Skills: " + String.join(", ", (Set<String>)app.getCandidate().getSkills()));
+        System.out.println("Required Skills: " + String.join(", ", (Set<String>)app.getJob().getReqSkills()));
+
+        int choice = showMenu("Mark as IN_REVIEW", "Schedule INTERVIEW", "DECLINE Application", "Do nothing (leave as SUBMITTED)");
+
+        ApplicationStage newStage = null;
+        switch (choice)
+        {
+            case 1: newStage = ApplicationStage.IN_REVIEW; break;
+            case 2: newStage = ApplicationStage.INTERVIEW; break;
+            case 3: newStage = ApplicationStage.DECLINED; break;
+            case 4: 
+                System.out.println("No action taken. Application remains in SUBMITTED stage.");
+                return;
+            default:
+                System.out.println("Invalid choice. No action taken.");
+                return;
+        }
+        
+        appService.updateStage(app, newStage);
+        System.out.println("Application stage for " + app.getCandidate().getName() + " updated to " + newStage + ".");
+    }
+    
+    private void showOrgJobs(Organization org)
+    {
+        List orgJobs = new ArrayList();
+        for (Object obj : storage.getAllJobs())
+        {
+            JobOpening job = (JobOpening) obj;
+            if (job.getOrg().getId().equals(org.getId()))
+            {
+                orgJobs.add(job);
+            }
+        }
+        if (orgJobs.isEmpty())
+        {
+            System.out.println("You have not posted any job openings yet.");
+            return;
+        }
+
+        System.out.println("\n--- Job Openings for " + org.getName() + " ---");
+        System.out.printf("%-10s | %-25s | %-10s | %s%n", "Job ID", "Title", "Status", "Applicants");
+        for (Object obj : orgJobs)
+        {
+            JobOpening job = (JobOpening) obj;
+            System.out.printf("%-10s | %-25s | %-10s | %d%n", job.getId(), job.getTitle(), job.getStatus(), job.getApplications().size());
+        }
+
+        System.out.print("\nEnter a Job ID or Title to manage (or press Enter to go back): ");
+        String jobInput = scan.nextLine();
+        if (jobInput.isEmpty())
+        {
+            return;
+        }
+
+        JobOpening selectedJob = findOrgJob(jobInput, org);
+        if (selectedJob != null)
+        {
+            manageJob(selectedJob);
+        }
+        else
+        {
+            System.out.println("No job found with that ID or title in your organization.");
+        }
+    }
+
+    private JobOpening findOrgJob(String input, Organization org)
+    {
+        String jobId = formatId(input, "job");
+        JobOpening job = storage.findJobById(jobId);
+        if (job != null && job.getOrg().getId().equals(org.getId()))
+        {
+            return job;
+        }
+
+        List matchingJobs = new ArrayList();
+        for (Object obj : storage.getAllJobs())
+        {
+            JobOpening j = (JobOpening) obj;
+            if (j.getOrg().getId().equals(org.getId()) && j.getTitle().equalsIgnoreCase(input))
+            {
+                matchingJobs.add(j);
+            }
+        }
+
+        if (matchingJobs.size() == 1)
+        {
+            return (JobOpening) matchingJobs.get(0);
+        }
+        if (matchingJobs.size() > 1)
+        {
+            System.out.println("Multiple jobs with the same title found. Please specify by ID:");
+            for (Object obj : matchingJobs)
+            {
+                JobOpening match = (JobOpening) obj;
+                System.out.println("ID: " + match.getId() + " | Title: " + match.getTitle());
+            }
+            System.out.print("Enter the specific Job ID: ");
+            String specificId = formatId(scan.nextLine(), "job");
+            return storage.findJobById(specificId);
+        }
+        return null;
+    }
+
+    private void manageJob(JobOpening job)
+    {
+        while (true)
+        {
+            System.out.println("\n--- Managing Job: " + job.getTitle() + " (" + job.getStatus() + ") ---");
+            if (job.getStatus() == JobStatus.FILLED)
+            {
+                System.out.println("Position filled by: " + job.getHired().getName());
+            }
+            showRankedApps(job);
+            
+            int choice = showMenu("Update an Application's Stage", "Back to Recruiter Dashboard");
+            
+            if (choice == 1)
+            {
+                updateAppStage(job);
+            }
+            else if (choice == 2)
+            {
+                return;
+            }
+        }
+    }
+
+    private void registerOrg()
+    {
+        System.out.print("Enter organization name: ");
+        String rawName = scan.nextLine();
+        String name = formatName(rawName); // Format the name
+        String password = getPassword();
+        String id = "company-" + orgCounter++;
+        Organization org = new Organization(id, name, password);
+        storage.saveOrg(org);
+        System.out.println("Organization registered! Your ID is: " + id);
+        System.out.println("Welcome, " + name + "! Logging you in...");
+        recruiterDashboard(org);
+    }
+
+    private void postNewJob(Organization org)
+    {
+        System.out.print("Enter job title: ");
+        String title = scan.nextLine();
+        System.out.print("Enter required years of experience: ");
+        int exp = getNumInput();
+        System.out.print("Enter required skills (comma-separated): ");
+        String[] skills = scan.nextLine().split(",");
+        String id = "job-" + jobCounter++;
+        JobOpening job = new JobOpening(id, title, org, exp);
+        for (String skill : skills)
+        {
+            job.addSkill(skill);
+        }
+        storage.saveJob(job);
+        System.out.println("Job opening posted! The Job ID is: " + id);
+    }
+    
+    private void showRankedApps(JobOpening job)
+    {
+        List rankedApps = matcher.rankApplicants(job);
+        if (rankedApps.isEmpty())
+        {
+            System.out.println("\nNo applicants for this job yet.");
+            return;
+        }
+        System.out.println("\n--- Applicants for " + job.getTitle() + " (Ranked by Score) ---");
+        System.out.printf("%-5s | %-15s | %-10s | %-12s | %s%n", "Rank", "Candidate", "App ID", "Match Score", "Stage");
+        for (int i = 0; i < rankedApps.size(); i++)
+        {
+            JobApplication app = (JobApplication) rankedApps.get(i);
+            System.out.printf("%-5d | %-15s | %-10d | %-12.2f | %s%n", 
+                i + 1, app.getCandidate().getName(), app.getAppId(), app.getScore(), app.getStage());
+        }
+    }
+    
+    private void updateAppStage(JobOpening job)
+    {
+        if (job.getStatus() == JobStatus.FILLED)
+        {
+            System.out.println("Position filled. Cannot change stages.");
+            return;
+        }
+        System.out.print("Enter the Application ID to update: ");
+        int appId = getNumInput();
+        
+        JobApplication targetApp = null;
+        for (Object appObj : job.getApplications())
+        {
+            JobApplication app = (JobApplication) appObj;
+            if (app.getAppId() == appId)
+            {
+                targetApp = app;
+                break;
+            }
+        }
+        if (targetApp == null)
+        {
+            System.out.println("Application not found for this job.");
+            return;
+        }
+        
+        System.out.println("Current stage for " + targetApp.getCandidate().getName() + ": " + targetApp.getStage());
+        
+        List validStages = new ArrayList();
+        for (ApplicationStage stage : ApplicationStage.values())
+        {
+            if (stage != ApplicationStage.OFFER_ACCEPTED && stage != ApplicationStage.OFFER_DECLINED)
+            {
+                validStages.add(stage);
+            }
+        }
+        
+        String[] options = new String[validStages.size()];
+        for (int i = 0; i < validStages.size(); i++)
+        {
+            options[i] = ((ApplicationStage) validStages.get(i)).name();
+        }
+        int choice = showMenu(options);
+        
+        if (choice > 0 && choice <= validStages.size())
+        {
+            appService.updateStage(targetApp, (ApplicationStage) validStages.get(choice - 1));
+            System.out.println("Stage updated successfully.");
+        }
+    }
+
+    private void candidateLogin()
+    {
+        System.out.println("\n--- Job Seeker Portal ---");
+        int choice = showMenu("Login to your Profile", "Create a new Profile", "Back to Main Menu");
+        switch (choice)
+        {
+            case 1: loginAsCandidate(); break;
+            case 2: registerCandidate(); break;
+            case 3: return;
+            default: System.out.println("Invalid choice.");
+        }
+    }
+
+    private void loginAsCandidate()
+    {
+        System.out.print("Enter your Candidate ID or Name: ");
+        String input = scan.nextLine();
+        Candidate candidate = findCandidate(input);
+
+        if (candidate == null)
+        {
+            System.out.println("Candidate profile not found.");
+            return;
+        }
+        
+        System.out.print("Enter password for " + candidate.getName() + ": ");
+        if (candidate.isPasswordCorrect(scan.nextLine()))
+        {
+            System.out.println("Login successful. Welcome, " + candidate.getName() + "!");
+            candidateDashboard(candidate);
+        }
+        else
+        {
+            System.out.println("Incorrect password. Access denied.");
+        }
+    }
+
+    private void candidateDashboard(Candidate candidate)
+    {
+        while (true)
+        {
+            int choice = showMenu("Search for Jobs", "Manage Your Applications", "View Recommended Jobs", "Logout");
+            switch (choice)
+            {
+                case 1: searchForJobs(candidate); break;
+                case 2: manageMyApps(candidate); break;
+                case 3: showRecommendedJobs(candidate); break;
+                case 4: return;
+                default: System.out.println("Invalid choice.");
+            }
+        }
+    }
+    
+    private void registerCandidate()
+    {
+        System.out.print("Enter your name: ");
+        String rawName = scan.nextLine();
+        String name = formatName(rawName); // Format the name
+        String password = getPassword();
+        System.out.print("Enter your years of experience: ");
+        int exp = getNumInput();
+        System.out.print("Enter your skills (comma-separated): ");
+        String[] skills = scan.nextLine().split(",");
+        String id = "seeker-" + candCounter++;
+        Candidate candidate = new Candidate(id, name, password, exp);
+        for (String skill : skills)
+        {
+            candidate.addSkill(skill);
+        }
+        storage.saveCandidate(candidate);
+        System.out.println("Profile created! Your ID is: " + id);
+        System.out.println("Welcome, " + name + "! Logging you in...");
+        candidateDashboard(candidate);
+    }
+
+    private void searchForJobs(Candidate candidate)
+    {
+        System.out.print("Search by company, title, or experience: ");
+        List jobs = search.find(scan.nextLine());
+        showJobs(jobs);
+        
+        if (!jobs.isEmpty())
+        {
+            System.out.print("\nEnter the Job ID to apply for (or press Enter to go back): ");
+            String jobInput = scan.nextLine();
+            if (!jobInput.isEmpty())
+            {
+                applyToJob(candidate, jobInput);
+            }
+        }
+    }
+
+    private void applyToJob(Candidate candidate, String jobInput)
+    {
+        JobOpening job = findJobToApply(jobInput);
+        if (job == null)
+        {
+            System.out.println("Job opening not found.");
+            return;
+        }
+        
+        boolean alreadyApplied = false;
+        for (Object appObj : candidate.getApplications())
+        {
+            JobApplication app = (JobApplication) appObj;
+            if (app.getJob().getId().equals(job.getId()))
+            {
+                alreadyApplied = true;
+                break;
+            }
+        }
+        if (alreadyApplied)
+        {
+            System.out.println("You have already applied for this job.");
+            return;
+        }
+        
+        if (job.getStatus() == JobStatus.FILLED)
+        {
+            System.out.println("This position has already been filled.");
+            return;
+        }
+
+        appService.newApplication(candidate, job);
+        System.out.println("Application submitted successfully!");
+    }
+    
+    private JobOpening findJobToApply(String input)
+    {
+        String jobId = formatId(input, "job");
+        JobOpening job = storage.findJobById(jobId);
+        if (job != null)
+        {
+            return job;
+        }
+
+        List matchingJobs = new ArrayList();
+        for (Object obj : storage.getAllJobs())
+        {
+            JobOpening j = (JobOpening) obj;
+            if (j.getTitle().equalsIgnoreCase(input))
+            {
+                matchingJobs.add(j);
+            }
+        }
+
+        if (matchingJobs.size() == 1)
+        {
+            return (JobOpening) matchingJobs.get(0);
+        }
+        if (matchingJobs.size() > 1)
+        {
+            System.out.println("Multiple jobs with this title found. Please specify by ID:");
+            for (Object obj : matchingJobs)
+            {
+                JobOpening match = (JobOpening) obj;
+                System.out.println("ID: " + match.getId() + " | Title: " + match.getTitle() + " | Company: " + match.getOrg().getName());
+            }
+            System.out.print("Enter the specific Job ID: ");
+            String specificId = formatId(scan.nextLine(), "job");
+            return storage.findJobById(specificId);
+        }
+        return null;
+    }
+
+    private void manageMyApps(Candidate candidate)
+    {
+        if (candidate.getApplications().isEmpty())
+        {
+            System.out.println("You have no applications.");
+            return;
+        }
+        System.out.println("\n--- Your Application History ---");
+        System.out.printf("%-10s | %-25s | %-15s | %s%n", "App ID", "Job Title", "Organization", "Stage");
+        
+        List offeredApps = new ArrayList();
+        for (Object appObj : candidate.getApplications())
+        {
+            JobApplication app = (JobApplication) appObj;
+            System.out.printf("%-10d | %-25s | %-15s | %s%n",
+                app.getAppId(), app.getJob().getTitle(), app.getJob().getOrg().getName(), app.getStage());
+            if (app.getStage() == ApplicationStage.OFFERED)
+            {
+                offeredApps.add(app);
+            }
+        }
+        
+        System.out.print("\nEnter an Application ID to respond to an offer (or press Enter to skip): ");
+        String appIdInput = scan.nextLine();
+        if (appIdInput.isEmpty())
+        {
+            return;
+        }
+
+        try
+        {
+            int appId = Integer.parseInt(appIdInput);
+            JobApplication targetApp = null;
+            for (Object appObj : candidate.getApplications())
+            {
+                JobApplication app = (JobApplication) appObj;
+                if (app.getAppId() == appId)
+                {
+                    targetApp = app;
+                    break;
+                }
+            }
+
+            if (targetApp == null)
+            {
+                System.out.println("Application ID not found in your history.");
+                return;
+            }
+
+            if (targetApp.getStage() == ApplicationStage.OFFERED)
+            {
+                respondToOffer(targetApp);
+            }
+            else
+            {
+                System.out.println("You can only respond to applications that are in the OFFERED stage.");
+            }
+        }
+        catch (NumberFormatException e)
+        {
+            System.out.println("Invalid input. Please enter a number.");
+        }
+    }
+    
+    private void respondToOffer(JobApplication offer)
+    {
+        System.out.println("\nResponding to offer for: " + offer.getJob().getTitle());
+        int choice = showMenu("Accept Offer", "Decline Offer");
+        if (choice == 1)
+        {
+            appService.updateStage(offer, ApplicationStage.OFFER_ACCEPTED);
+            offer.getJob().fillPosition(offer.getCandidate());
+            for (Object otherAppObj : offer.getJob().getApplications())
+            {
+                JobApplication otherApp = (JobApplication) otherAppObj;
+                if (otherApp.getAppId() != offer.getAppId())
+                {
+                    appService.updateStage(otherApp, ApplicationStage.DECLINED);
+                }
+            }
+            System.out.println("Congratulations! You have accepted the offer.");
+        }
+        else if (choice == 2)
+        {
+            appService.updateStage(offer, ApplicationStage.OFFER_DECLINED);
+            System.out.println("You have declined the offer.");
+        }
+    }
+
+    private void showRecommendedJobs(Candidate candidate)
+    {
+        Map recommendedJobs = new HashMap();
+        for (Object jobObj : storage.getAllJobs())
+        {
+            JobOpening job = (JobOpening) jobObj;
+            if (job.getStatus() == JobStatus.OPEN)
+            {
+                double score = matcher.calculateScore(candidate, job);
+                if (score > 50)
+                {
+                    recommendedJobs.put(job, new Double(score));
+                }
+            }
+        }
+
+        if (recommendedJobs.isEmpty())
+        {
+            System.out.println("No recommendations for you.");
+            return;
+        }
+        
+        List sortedRecs = new ArrayList(recommendedJobs.entrySet());
+        // DSA Concept: MERGE/QUICK SORT (via Collections.sort)
+        Collections.sort(sortedRecs, new RecommendationScoreComparator());
+        
+        System.out.println("\n--- Recommended Jobs For You ---");
+        System.out.printf("%-10s | %-25s | %-15s | %s%n", "Job ID", "Title", "Organization", "Match Score");
+        for (Object entryObj : sortedRecs)
+        {
+            Map.Entry entry = (Map.Entry) entryObj;
+            JobOpening job = (JobOpening) entry.getKey();
+            Double score = (Double) entry.getValue();
+            System.out.printf("%-10s | %-25s | %-15s | %.2f%%%n",
+                job.getId(), job.getTitle(), job.getOrg().getName(), score);
+        }
+        
+        System.out.print("\nEnter the Job ID to apply for (or press Enter to go back): ");
+        String jobInput = scan.nextLine();
+        if (!jobInput.isEmpty())
+        {
+            applyToJob(candidate, jobInput);
+        }
+    }
+
+    // --- Helper Methods for UI ---
+    private Organization findOrg(String input)
+    {
+        String orgId = formatId(input, "company");
+        Organization org = storage.findOrgById(orgId);
+        if (org != null)
+        {
+            return org;
+        }
+        
+        // DSA Concept: TRAVERSAL (Linear Search)
+        for (Object obj : storage.getAllOrgs())
+        {
+            Organization o = (Organization) obj;
+            if (o.getName().equalsIgnoreCase(input))
+            {
+                return o;
+            }
+        }
+        return null;
+    }
+
+    private Candidate findCandidate(String input)
+    {
+        String candidateId = formatId(input, "seeker");
+        Candidate candidate = storage.findCandidateById(candidateId);
+        if (candidate != null)
+        {
+            return candidate;
+        }
+        
+        // DSA Concept: TRAVERSAL (Linear Search)
+        for (Object obj : storage.getAllCandidates())
+        {
+            Candidate c = (Candidate) obj;
+            if (c.getName().equalsIgnoreCase(input))
+            {
+                return c;
+            }
+        }
+        return null;
+    }
+    
+    private String getPassword()
+    {
+        while (true)
+        {
+            System.out.print("Set a password: ");
+            String password = scan.nextLine();
+            if (password.isEmpty())
+            {
+                System.out.println("Password cannot be empty. Please try again.");
+            }
+            else
+            {
+                return password;
+            }
+        }
+    }
+
+    private int showMenu(String... options)
+    {
+        System.out.println("\n--- Options ---");
+        for (int i = 0; i < options.length; i++)
+        {
+            System.out.println((i + 1) + ". " + options[i]);
+        }
+        System.out.print("Enter your choice: ");
+        return getNumInput();
+    }
+    
+    private String formatId(String rawInput, String prefix)
+    {
+        String lowerInput = rawInput.trim().toLowerCase();
+        if (lowerInput.startsWith(prefix))
+        {
+            return lowerInput;
+        }
+        if (lowerInput.startsWith(prefix.substring(0, 1)))
+        {
+            String numPart = rawInput.replaceAll("[^0-9]", "");
+            if (!numPart.isEmpty())
+            {
+                return prefix + "-" + numPart;
+            }
+        }
+        return rawInput;
+    }
+    
+    private int getNumInput()
+    {
+        while (true)
+        {
+            try
+            {
+                return Integer.parseInt(scan.nextLine());
+            } 
+            catch (NumberFormatException e)
+            {
+                System.out.print("Invalid input. Please enter a number: ");
+            }
+        }
+    }
+    
+    private void showJobs(List jobs)
+    {
+        if (jobs.isEmpty())
+        {
+            System.out.println("No jobs found.");
+            return;
+        }
+        System.out.println("\n--- Job Search Results ---");
+        System.out.printf("%-10s | %-25s | %-15s | %-5s | %s%n", "Job ID", "Title", "Organization", "Exp.", "Skills");
+        // DSA Concept: TRAVERSAL (Linear)
+        for (Object obj : jobs)
+        {
+            JobOpening job = (JobOpening) obj;
+            String skillsStr = "";
+            Iterator it = job.getReqSkills().iterator();
+            while (it.hasNext())
+            {
+                skillsStr += (String) it.next();
+                if (it.hasNext())
+                {
+                    skillsStr += ", ";
+                }
+            }
+            System.out.printf("%-10s | %-25s | %-15s | %-5d | %s%n",
+                job.getId(), job.getTitle(), job.getOrg().getName(),
+                job.getReqExperience(), skillsStr);
+        }
+    }
+    
+    private String formatName(String name)
+    {
+        if (name == null || name.isEmpty())
+        {
+            return "";
+        }
+        
+        String[] words = name.split("\\s+");
+        String formattedName = "";
+        for (int i = 0; i < words.length; i++)
+        {
+            String word = words[i];
+            if (word.length() > 0)
+            {
+                formattedName += word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase();
+                if (i < words.length - 1)
+                {
+                    formattedName += " ";
+                }
+            }
+        }
+        return formattedName;
+    }
+}
+
+
+// =================================================================================
+// 7. MAIN CLASS (The Entry Point)
+// =================================================================================
+public class JobPortal
+{
+    public static void main(String[] args)
+    {
+        JobPortalCLI consoleApp = new JobPortalCLI();
+        consoleApp.start();
+    }
+}
